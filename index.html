@@ -152,6 +152,9 @@
 
   .notes span.on { opacity: 1; }
 
+  /* Givens are fixed: shaded here, and place()/erase() refuse to touch them. */
+  .cell.is-given { background: #ece5d6; }
+
   .cell.is-peer { background: #f5f0e4; }
   .cell.is-same { background: var(--accent-soft); }
   .cell.is-selected { background: #f1e7d7; box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
@@ -227,7 +230,27 @@
   #notesBtn[aria-pressed="true"],
   #autoBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+  .help {
+    width: min(92vw, 460px);
+    max-height: 82vh;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: 0 24px 60px -30px rgba(35, 42, 49, 0.8);
+  }
+
+  .help::backdrop { background: rgba(35, 42, 49, 0.35); }
+  .help[open] { display: flex; flex-direction: column; }
+  .help h2 { margin: 0 0 14px; font-size: 1.1rem; flex: none; }
+  .help h2:focus { outline: none; }
+  .help dl { margin: 0 0 18px; font-size: 0.85rem; line-height: 1.45; overflow-y: auto; flex: 1 1 auto; padding-right: 6px; }
+  .help #helpClose { flex: none; align-self: flex-start; }
+  .help dt { margin-top: 10px; font-weight: 600; }
+  .help dd { margin: 2px 0 0; color: var(--muted); }
 
   .status { min-height: 2.6em; margin: 0; font-size: 0.85rem; line-height: 1.4; color: var(--muted); }
   .status.good { color: var(--good); }
@@ -279,6 +302,7 @@
       <div class="checks">
         <button class="btn" id="check">Check</button>
         <button class="btn" id="solve">Solve</button>
+        <button class="btn" id="help">Help</button>
       </div>
 
       <div class="meta">
@@ -297,6 +321,35 @@
     </aside>
   </section>
 </main>
+
+<dialog class="help" id="helpDialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle" tabindex="-1">What each control does</h2>
+  <dl>
+    <dt>Easy / Medium / Hard / Expert</dt>
+    <dd>Picks the difficulty and starts a new puzzle of that level straight away.</dd>
+    <dt>1–9</dt>
+    <dd>Writes that digit in the selected cell. Tapping the digit already there clears the cell.</dd>
+    <dt>Erase</dt>
+    <dd>Clears the selected cell: its value, its notes, and any candidates you crossed off.</dd>
+    <dt>Notes</dt>
+    <dd>Switches digit taps between filling cells and editing pencil marks.</dd>
+    <dt>Auto notes</dt>
+    <dd>Shows every empty cell's legal candidates and keeps them in step with the board. In Notes mode you can cross a candidate off — or put it back — to record a deduction.</dd>
+    <dt>Check</dt>
+    <dd>Marks any cells that disagree with the solution.</dd>
+    <dt>Solve</dt>
+    <dd>Fills in the whole solution and ends the puzzle.</dd>
+    <dt>Time</dt>
+    <dd>Time spent on this puzzle. It stops when you solve or reveal it.</dd>
+    <dt>Clues</dt>
+    <dd>How many cells came pre-filled. Those are the shaded givens, and they cannot be edited.</dd>
+    <dt>New puzzle</dt>
+    <dd>Generates another puzzle at the current difficulty and restarts the timer.</dd>
+    <dt>Keyboard</dt>
+    <dd>Arrow keys move, 1–9 enters a digit, Backspace / Delete / 0 clears, N toggles Notes, Esc closes this help.</dd>
+  </dl>
+  <button class="btn" id="helpClose">Close</button>
+</dialog>
 
 <script>
 /*
@@ -570,6 +623,7 @@ var Sudoku = (function () {
       cell.el.classList.toggle("is-same", focusValue !== 0 && value === focusValue && selected !== i);
       cell.el.classList.toggle("is-bad", bad.has(i));
       cell.el.classList.toggle("has-notes", marks !== 0);
+      cell.el.setAttribute("aria-readonly", puzzle[i] !== 0);
 
       cell.value.textContent = value ? String(value) : "";
       cell.noteEls.forEach((span, n) => {
@@ -718,6 +772,16 @@ var Sudoku = (function () {
   document.getElementById("new").addEventListener("click", newPuzzle);
   document.getElementById("check").addEventListener("click", check);
   document.getElementById("solve").addEventListener("click", reveal);
+
+  const helpDialog = document.getElementById("helpDialog");
+  document.getElementById("help").addEventListener("click", () => {
+    helpDialog.showModal();
+    helpDialog.querySelector("h2").focus();   // read from the top, not from the Close button
+  });
+  document.getElementById("helpClose").addEventListener("click", () => helpDialog.close());
+  helpDialog.addEventListener("click", (event) => {
+    if (event.target === helpDialog) helpDialog.close();   // click the backdrop to dismiss
+  });
 
   newPuzzle();
 })();
