@@ -293,7 +293,7 @@
       </div>
 
       <p class="status" id="status" role="status" aria-live="polite"></p>
-      <p class="hint">Tap a cell, then type 1–9. Arrow keys move, N toggles notes.</p>
+      <p class="hint">Tap a cell, then type 1–9. Arrow keys move, N toggles notes. In notes mode a digit removes or restores a mark, including the auto ones.</p>
     </aside>
   </section>
 </main>
@@ -489,6 +489,7 @@ var Sudoku = (function () {
   let solution = [];                      // the full grid
   let values = [];                        // what is on the board now
   let notes = new Array(81).fill(0);      // pencil marks as a bitmask per cell
+  let excluded = new Array(81).fill(0);   // candidates the player crossed off auto notes
   let selected = null;
   let notesMode = false;
   let autoNotes = false;                  // show derived candidates instead of manual marks
@@ -524,17 +525,15 @@ var Sudoku = (function () {
     autoBtn.setAttribute("aria-pressed", String(autoNotes));
   }
 
-  // Manual notes and auto notes show the same cells, so only one can be on.
+  // Notes mode edits the marks; auto notes decides whether they are derived or hand-written.
   function setNotesMode(on) {
     notesMode = on;
-    if (on) autoNotes = false;
     syncNotesButtons();
     render();
   }
 
   function setAutoNotes(on) {
     autoNotes = on;
-    if (on) notesMode = false;
     syncNotesButtons();
     render();
   }
@@ -562,7 +561,7 @@ var Sudoku = (function () {
       const cell = cells[i];
       const value = values[i];
       let marks = 0;
-      if (!value) marks = autoNotes ? candidates(i) : notes[i];
+      if (!value) marks = autoNotes ? candidates(i) & ~excluded[i] : notes[i];
 
       cell.el.classList.toggle("is-given", puzzle[i] !== 0);
       cell.el.classList.toggle("is-user", puzzle[i] === 0 && value !== 0);
@@ -595,6 +594,7 @@ var Sudoku = (function () {
     solution = generated.solution;
     values = puzzle.slice();
     notes = new Array(81).fill(0);
+    excluded = new Array(81).fill(0);
     flagged = new Set();
     selected = null;
     locked = false;
@@ -617,7 +617,13 @@ var Sudoku = (function () {
     const i = selected;
 
     if (notesMode) {
-      if (!values[i]) notes[i] ^= 1 << (digit - 1);
+      const bit = 1 << (digit - 1);
+      if (autoNotes) {
+        // Only legal candidates can be toggled, so a mark never contradicts the board.
+        if (!values[i] && (candidates(i) & bit)) excluded[i] ^= bit;
+      } else if (!values[i]) {
+        notes[i] ^= bit;
+      }
     } else {
       values[i] = values[i] === digit ? 0 : digit;
       if (values[i]) notes[i] = 0;
@@ -635,6 +641,7 @@ var Sudoku = (function () {
     if (locked || selected === null || puzzle[selected]) return;
     values[selected] = 0;
     notes[selected] = 0;
+    excluded[selected] = 0;
     flagged.delete(selected);
     render();
   }
