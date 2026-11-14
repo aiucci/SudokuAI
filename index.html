@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sudoku — puzzle generator</title>
+<title>SudokuAI — puzzle generator</title>
 <style>
   :root {
     --paper: #f3efe6;
@@ -52,31 +52,14 @@
     letter-spacing: -0.02em;
   }
 
-  .sub { margin: 0; color: var(--muted); font-size: 0.92rem; }
-
-  .levels {
-    display: flex;
-    gap: 2px;
-    padding: 4px;
-    background: #faf6ec;
-    border: 1px solid var(--line);
-    border-radius: 999px;
+  .level-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 0 0 18px;
   }
 
-  .levels button {
-    border: 0;
-    background: transparent;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font: inherit;
-    font-size: 0.85rem;
-    color: var(--muted);
-    cursor: pointer;
-    transition: background 0.14s ease, color 0.14s ease;
-  }
-
-  .levels button:hover { color: var(--ink); }
-  .levels button.is-active { background: var(--ink); color: #fdfbf5; }
+  .level-choice button.is-active { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
 
   .play {
     display: grid;
@@ -152,18 +135,21 @@
 
   .notes span.on { opacity: 1; }
 
-  /* Givens are fixed: shaded here, and place()/erase() refuse to touch them. */
-  .cell.is-given { background: #ece5d6; }
+  /* Auto-note hints: green for a lone candidate, blue for a two-candidate cell. */
+  .cell.is-single { background: #e3efe5; }
+  .cell.is-pair { background: #e5e9f6; }
 
   .cell.is-peer { background: #f5f0e4; }
   .cell.is-same { background: var(--accent-soft); }
   .cell.is-selected { background: #f1e7d7; box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
-  .cell.is-given .value { color: var(--ink); font-weight: 600; }
+  .cell.is-given .value { color: var(--ink); font-weight: 700; }
   .cell.is-user .value { color: var(--user); }
   .cell.is-bad { background: #fbe6e2; }
   .cell.is-bad .value { color: var(--bad); font-weight: 700; }
 
   .side { display: flex; flex-direction: column; gap: 12px; }
+
+  .meta[hidden] { display: none; }
 
   .meta {
     display: flex;
@@ -224,15 +210,16 @@
     transition: background 0.14s ease;
   }
 
-  .pad button:hover { background: #f6f0e4; }
+  .pad button:hover:not(:disabled) { background: #f6f0e4; }
+  .pad button:disabled { opacity: 0.35; cursor: default; }
   .pad button.wide { grid-column: span 3; font-size: 0.88rem; }
   .pad button.full { grid-column: span 6; font-size: 0.88rem; }
   #notesBtn[aria-pressed="true"],
   #autoBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 
-  .help {
+  .dialog {
     width: min(92vw, 460px);
     max-height: 82vh;
     padding: 22px 24px;
@@ -243,14 +230,26 @@
     box-shadow: 0 24px 60px -30px rgba(35, 42, 49, 0.8);
   }
 
-  .help::backdrop { background: rgba(35, 42, 49, 0.35); }
-  .help[open] { display: flex; flex-direction: column; }
-  .help h2 { margin: 0 0 14px; font-size: 1.1rem; flex: none; }
-  .help h2:focus { outline: none; }
-  .help dl { margin: 0 0 18px; font-size: 0.85rem; line-height: 1.45; overflow-y: auto; flex: 1 1 auto; padding-right: 6px; }
-  .help #helpClose { flex: none; align-self: flex-start; }
-  .help dt { margin-top: 10px; font-weight: 600; }
-  .help dd { margin: 2px 0 0; color: var(--muted); }
+  .dialog::backdrop { background: rgba(35, 42, 49, 0.35); }
+  .dialog[open] { display: flex; flex-direction: column; }
+  .dialog h2 { margin: 0 0 14px; font-size: 1.1rem; flex: none; }
+  .dialog h2:focus { outline: none; }
+  .dialog dl { margin: 0 0 18px; font-size: 0.85rem; line-height: 1.45; overflow-y: auto; flex: 1 1 auto; padding-right: 6px; }
+  .dialog dt { margin-top: 10px; font-weight: 600; }
+  .dialog dd { margin: 2px 0 0; color: var(--muted); }
+  .dialog-close { flex: none; align-self: flex-start; }
+
+  .option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 20px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+
+  .option input { flex: none; margin: 2px 0 0; inline-size: 1.05em; block-size: 1.05em; accent-color: var(--accent); }
 
   .status { min-height: 2.6em; margin: 0; font-size: 0.85rem; line-height: 1.4; color: var(--muted); }
   .status.good { color: var(--good); }
@@ -269,14 +268,7 @@
 <main class="shell">
   <header class="head">
     <div>
-      <h1>Sudoku</h1>
-      <p class="sub">A fresh puzzle every time — generated and checked for a single solution.</p>
-    </div>
-    <div class="levels" id="levels" role="group" aria-label="Difficulty">
-      <button data-level="easy" class="is-active">Easy</button>
-      <button data-level="medium">Medium</button>
-      <button data-level="hard">Hard</button>
-      <button data-level="expert">Expert</button>
+      <h1>SudokuAI</h1>
     </div>
   </header>
 
@@ -303,13 +295,18 @@
         <button class="btn" id="check">Check</button>
         <button class="btn" id="solve">Solve</button>
         <button class="btn" id="help">Help</button>
+        <button class="btn" id="options">Options</button>
       </div>
 
       <div class="meta">
         <span class="meta-label">Time</span>
         <span class="metric" id="timer">00:00</span>
       </div>
-      <div class="meta">
+      <div class="meta" id="remainingField" hidden>
+        <span class="meta-label">Remaining</span>
+        <span class="metric" id="remaining">—</span>
+      </div>
+      <div class="meta" id="cluesField" hidden>
         <span class="meta-label">Clues</span>
         <span class="metric" id="clues">—</span>
       </div>
@@ -322,33 +319,67 @@
   </section>
 </main>
 
-<dialog class="help" id="helpDialog" aria-labelledby="helpTitle">
+<dialog class="dialog" id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle" tabindex="-1">What each control does</h2>
   <dl>
-    <dt>Easy / Medium / Hard / Expert</dt>
-    <dd>Picks the difficulty and starts a new puzzle of that level straight away.</dd>
     <dt>1–9</dt>
-    <dd>Writes that digit in the selected cell. Tapping the digit already there clears the cell.</dd>
+    <dd>Writes that digit in the selected cell. A filled cell is never overwritten — clear it with Erase first.</dd>
     <dt>Erase</dt>
-    <dd>Clears the selected cell: its value, its notes, and any candidates you crossed off.</dd>
+    <dd>Clears the selected cell: its value, its notes, and any candidates you crossed off. This is the only way to remove or change a placed number.</dd>
     <dt>Notes</dt>
     <dd>Switches digit taps between filling cells and editing pencil marks.</dd>
     <dt>Auto notes</dt>
-    <dd>Shows every empty cell's legal candidates and keeps them in step with the board. In Notes mode you can cross a candidate off — or put it back — to record a deduction.</dd>
+    <dd>Shows every empty cell's legal candidates and keeps them in step with the board. In Notes mode you can cross a candidate off — or put it back — to record a deduction. Cells left with one candidate are tinted green, those with two are tinted blue.</dd>
     <dt>Check</dt>
     <dd>Marks any cells that disagree with the solution.</dd>
     <dt>Solve</dt>
     <dd>Fills in the whole solution and ends the puzzle.</dd>
     <dt>Time</dt>
     <dd>Time spent on this puzzle. It stops when you solve or reveal it.</dd>
+    <dt>Remaining</dt>
+    <dd>How many cells are still empty, counting down as you go. Hidden until you turn it on in Options.</dd>
     <dt>Clues</dt>
-    <dd>How many cells came pre-filled. Those are the shaded givens, and they cannot be edited.</dd>
+    <dd>How many cells came pre-filled. Those are the bold givens, and they cannot be edited. Hidden until you turn it on in Options.</dd>
     <dt>New puzzle</dt>
-    <dd>Generates another puzzle at the current difficulty and restarts the timer.</dd>
+    <dd>Asks for a difficulty — Easy, Medium, Hard or Expert — then generates a puzzle at that level and restarts the timer. Cancel keeps the current game.</dd>
+    <dt>Options</dt>
+    <dd>Opens the settings panel: switch off the highlighting of the selected number, row, column and box, show the clues counter or the remaining cell count, or mute the placement sounds.</dd>
     <dt>Keyboard</dt>
     <dd>Arrow keys move, 1–9 enters a digit, Backspace / Delete / 0 clears, N toggles Notes, Esc closes this help.</dd>
   </dl>
-  <button class="btn" id="helpClose">Close</button>
+  <button class="btn dialog-close" id="helpClose">Close</button>
+</dialog>
+
+<dialog class="dialog" id="optionsDialog" aria-labelledby="optionsTitle">
+  <h2 id="optionsTitle" tabindex="-1">Options</h2>
+  <label class="option">
+    <input type="checkbox" id="optHighlight" checked>
+    <span>Highlight the selected number, row, column and box</span>
+  </label>
+  <label class="option">
+    <input type="checkbox" id="optClues">
+    <span>Show the clues counter</span>
+  </label>
+  <label class="option">
+    <input type="checkbox" id="optRemaining">
+    <span>Show the remaining cell count</span>
+  </label>
+  <label class="option">
+    <input type="checkbox" id="optSound" checked>
+    <span>Play a sound when a number is placed</span>
+  </label>
+  <button class="btn dialog-close" id="optionsClose">Close</button>
+</dialog>
+
+<dialog class="dialog" id="levelDialog" aria-labelledby="levelTitle">
+  <h2 id="levelTitle" tabindex="-1">New puzzle</h2>
+  <div class="level-choice">
+    <button class="btn" data-level="easy">Easy</button>
+    <button class="btn" data-level="medium">Medium</button>
+    <button class="btn" data-level="hard">Hard</button>
+    <button class="btn" data-level="expert">Expert</button>
+  </div>
+  <button class="btn dialog-close" id="levelCancel">Cancel</button>
 </dialog>
 
 <script>
@@ -502,11 +533,12 @@ var Sudoku = (function () {
   const board = document.getElementById("board");
   const timerEl = document.getElementById("timer");
   const cluesEl = document.getElementById("clues");
+  const remainingEl = document.getElementById("remaining");
   const statusEl = document.getElementById("status");
-  const levels = document.getElementById("levels");
   const pad = document.getElementById("pad");
   const notesBtn = document.getElementById("notesBtn");
   const autoBtn = document.getElementById("autoBtn");
+  const digitButtons = Array.from(pad.querySelectorAll("[data-digit]"));
 
   const cells = [];
   for (let i = 0; i < 81; i++) {
@@ -546,6 +578,8 @@ var Sudoku = (function () {
   let selected = null;
   let notesMode = false;
   let autoNotes = false;                  // show derived candidates instead of manual marks
+  let highlights = true;                  // shade peers and matching numbers on selection
+  let soundOn = true;                     // feedback tones for placed numbers
   let locked = false;                     // solved or revealed: read-only board
   let flagged = new Set();                // cells the last Check found wrong
   let startedAt = 0;
@@ -561,6 +595,15 @@ var Sudoku = (function () {
       if (v) used |= 1 << (v - 1);
     }
     return ALL_DIGITS & ~used;
+  }
+
+  function bitCount(mask) {
+    let n = 0;
+    while (mask) {
+      mask &= mask - 1;
+      n++;
+    }
+    return n;
   }
 
   function formatTime(ms) {
@@ -591,6 +634,40 @@ var Sudoku = (function () {
     render();
   }
 
+  // Feedback tones, synthesised on the fly so the page stays a single file.
+  let audioCtx = null;
+
+  function tone(frequency, duration, type, delay) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const start = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(start);
+    osc.stop(start + duration + 0.02);
+  }
+
+  function playCorrect() {
+    if (!soundOn) return;
+    tone(659.25, 0.14, "sine", 0);        // E5
+    tone(987.77, 0.18, "sine", 0.1);      // B5, a rising fifth
+  }
+
+  function playWrong() {
+    if (!soundOn) return;
+    tone(196, 0.18, "triangle", 0);       // G3
+    tone(146.83, 0.22, "triangle", 0.11); // D3, a low fall
+  }
+
   function render() {
     const bad = new Set();
     for (const unit of Sudoku.units) {
@@ -610,6 +687,17 @@ var Sudoku = (function () {
 
     const focusValue = selected === null ? 0 : values[selected];
 
+    // A digit is finished once all nine of its cells hold their correct value.
+    const complete = new Array(10).fill(0);
+    let filled = 0;
+    for (let i = 0; i < 81; i++) {
+      if (!values[i]) continue;
+      filled++;
+      if (values[i] === solution[i]) complete[values[i]]++;
+    }
+    for (const btn of digitButtons) btn.disabled = complete[Number(btn.dataset.digit)] === 9;
+    remainingEl.textContent = String(81 - filled);
+
     for (let i = 0; i < 81; i++) {
       const cell = cells[i];
       const value = values[i];
@@ -619,9 +707,14 @@ var Sudoku = (function () {
       cell.el.classList.toggle("is-given", puzzle[i] !== 0);
       cell.el.classList.toggle("is-user", puzzle[i] === 0 && value !== 0);
       cell.el.classList.toggle("is-selected", selected === i);
-      cell.el.classList.toggle("is-peer", selected !== null && peers[selected].has(i));
-      cell.el.classList.toggle("is-same", focusValue !== 0 && value === focusValue && selected !== i);
+      cell.el.classList.toggle("is-peer", highlights && selected !== null && peers[selected].has(i));
+      cell.el.classList.toggle("is-same", highlights && focusValue !== 0 && value === focusValue && selected !== i);
       cell.el.classList.toggle("is-bad", bad.has(i));
+      // Auto-note hints: how close a cell is to falling.
+      const markCount = !value && autoNotes ? bitCount(marks) : 0;
+      cell.el.classList.toggle("is-single", markCount === 1);
+      cell.el.classList.toggle("is-pair", markCount === 2);
+
       cell.el.classList.toggle("has-notes", marks !== 0);
       cell.el.setAttribute("aria-readonly", puzzle[i] !== 0);
 
@@ -679,8 +772,11 @@ var Sudoku = (function () {
         notes[i] ^= bit;
       }
     } else {
-      values[i] = values[i] === digit ? 0 : digit;
-      if (values[i]) notes[i] = 0;
+      if (values[i]) return;              // filled cells are only cleared with Erase
+      values[i] = digit;
+      notes[i] = 0;
+      if (digit === solution[i]) playCorrect();
+      else playWrong();
     }
 
     flagged.delete(i);
@@ -761,26 +857,70 @@ var Sudoku = (function () {
     else erase();
   });
 
-  levels.addEventListener("click", (event) => {
-    const btn = event.target.closest("button[data-level]");
-    if (!btn) return;
-    level = btn.dataset.level;
-    for (const other of levels.children) other.classList.toggle("is-active", other === btn);
-    newPuzzle();
-  });
-
-  document.getElementById("new").addEventListener("click", newPuzzle);
   document.getElementById("check").addEventListener("click", check);
   document.getElementById("solve").addEventListener("click", reveal);
 
   const helpDialog = document.getElementById("helpDialog");
-  document.getElementById("help").addEventListener("click", () => {
-    helpDialog.showModal();
-    helpDialog.querySelector("h2").focus();   // read from the top, not from the Close button
+  const optionsDialog = document.getElementById("optionsDialog");
+  const levelDialog = document.getElementById("levelDialog");
+  const levelButtons = Array.from(levelDialog.querySelectorAll("[data-level]"));
+
+  function openDialog(dialog) {
+    dialog.showModal();
+    dialog.querySelector("h2").focus();   // read from the top, not from the Close button
+  }
+
+  for (const dialog of [helpDialog, optionsDialog, levelDialog]) {
+    dialog.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();   // click the backdrop to dismiss
+    });
+  }
+
+  function syncLevelButtons() {
+    for (const btn of levelButtons) {
+      const active = btn.dataset.level === level;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    }
+  }
+
+  for (const btn of levelButtons) {
+    btn.addEventListener("click", () => {
+      level = btn.dataset.level;
+      levelDialog.close();
+      newPuzzle();
+    });
+  }
+
+  document.getElementById("new").addEventListener("click", () => {
+    syncLevelButtons();
+    openDialog(levelDialog);
   });
-  document.getElementById("helpClose").addEventListener("click", () => helpDialog.close());
-  helpDialog.addEventListener("click", (event) => {
-    if (event.target === helpDialog) helpDialog.close();   // click the backdrop to dismiss
+  document.getElementById("help").addEventListener("click", () => openDialog(helpDialog));
+  document.getElementById("options").addEventListener("click", () => openDialog(optionsDialog));
+
+  const highlightToggle = document.getElementById("optHighlight");
+  highlightToggle.addEventListener("change", () => {
+    highlights = highlightToggle.checked;
+    render();
+  });
+
+  const cluesField = document.getElementById("cluesField");
+  const cluesToggle = document.getElementById("optClues");
+  cluesToggle.addEventListener("change", () => {
+    cluesField.hidden = !cluesToggle.checked;
+  });
+
+  const remainingField = document.getElementById("remainingField");
+  const remainingToggle = document.getElementById("optRemaining");
+  remainingToggle.addEventListener("change", () => {
+    remainingField.hidden = !remainingToggle.checked;
+  });
+
+  const soundToggle = document.getElementById("optSound");
+  soundToggle.addEventListener("change", () => {
+    soundOn = soundToggle.checked;
   });
 
   newPuzzle();
