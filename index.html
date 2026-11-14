@@ -212,7 +212,8 @@
     transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
   }
 
-  .btn:hover { border-color: #bdb5a3; transform: translateY(-1px); }
+  .btn:hover:not(:disabled) { border-color: #bdb5a3; transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
   .btn-primary { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
   .btn-primary:hover { background: #323b45; border-color: #323b45; }
 
@@ -278,11 +279,71 @@
 
   .option input { flex: none; margin: 2px 0 0; inline-size: 1.05em; block-size: 1.05em; accent-color: var(--accent); }
 
-  .status { min-height: 2.6em; margin: 0; font-size: 0.85rem; line-height: 1.4; color: var(--muted); }
-  .status.good { color: var(--good); }
-  .status.bad { color: var(--bad); }
+  /* Outcomes are announced to screen readers but no longer shown under the controls. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
-  .hint { margin: 0; font-size: 0.76rem; color: var(--muted); }
+  /* Opening screen: the board stays inert until a difficulty is chosen here. */
+  .splash {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 40px);
+    background: rgba(243, 239, 230, 0.94);
+    animation: splash-in 0.4s ease both;
+  }
+
+  .splash[hidden] { display: none; }
+
+  @keyframes splash-in { from { opacity: 0; } to { opacity: 1; } }
+
+  .splash-card {
+    width: min(430px, 100%);
+    padding: clamp(22px, 4vw, 34px);
+    text-align: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 30px 70px -40px rgba(35, 42, 49, 0.75);
+  }
+
+  .splash-card h1 { margin: 0 0 6px; font-size: clamp(2.1rem, 6vw, 2.7rem); }
+  .splash-prompt { margin: 0 0 20px; font-size: 0.92rem; color: var(--muted); }
+
+  .splash-levels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .splash-levels button {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 14px 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease;
+  }
+
+  .splash-levels button:hover { background: #f6f0e4; border-color: #bdb5a3; }
+  #splashOptions { width: 100%; }
+  .splash .btn:hover:not(:disabled) { transform: none; }
 
   @media (max-width: 820px) {
     body { padding: 24px 16px 40px; }
@@ -344,11 +405,24 @@
 
       <button class="btn btn-primary" id="new">New puzzle</button>
 
-      <p class="status" id="status" role="status" aria-live="polite"></p>
-      <p class="hint">Tap a cell, then type 1–9. Arrow keys move, N toggles notes. In notes mode a digit removes or restores a mark, including the auto ones.</p>
+      <p class="sr-only" id="status" role="status" aria-live="polite"></p>
     </aside>
   </section>
 </main>
+
+<div class="splash" id="splash" role="dialog" aria-modal="true" aria-labelledby="splashTitle">
+  <div class="splash-card">
+    <h1 id="splashTitle">SudokuAI</h1>
+    <p class="splash-prompt">Choose a difficulty to start</p>
+    <div class="splash-levels">
+      <button data-splash-level="easy">Easy</button>
+      <button data-splash-level="medium">Medium</button>
+      <button data-splash-level="hard">Hard</button>
+      <button data-splash-level="expert">Expert</button>
+    </div>
+    <button class="btn" id="splashOptions">Options</button>
+  </div>
+</div>
 
 <dialog class="dialog" id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle" tabindex="-1">What each control does</h2>
@@ -358,11 +432,11 @@
     <dt>Erase</dt>
     <dd>Clears the selected cell: a wrong number, its notes, and any candidates you crossed off. It stays disabled on givens and on numbers that are already correct.</dd>
     <dt>Notes</dt>
-    <dd>Switches digit taps between filling cells and editing pencil marks.</dd>
+    <dd>Switches digit taps between filling cells and editing pencil marks. It greys out once the game is over or solved.</dd>
     <dt>Auto notes</dt>
-    <dd>Shows every empty cell's legal candidates and keeps them in step with the board. In Notes mode you can cross a candidate off — or put it back — to record a deduction. Cells left with one candidate are tinted green, those with two are tinted blue.</dd>
+    <dd>Shows every empty cell's legal candidates and keeps them in step with the board. In Notes mode you can cross a candidate off — or put it back — to record a deduction. Cells left with one candidate are tinted green, those with two are tinted blue. Like Notes, it greys out once the game is over or solved.</dd>
     <dt>Solve</dt>
-    <dd>Fills in the whole solution and ends the puzzle. Options can animate it cell by cell instead of revealing it at once.</dd>
+    <dd>Fills in the whole solution and ends the puzzle. Options can animate it cell by cell instead of revealing it at once. It greys out once the game is over.</dd>
     <dt>Time</dt>
     <dd>Time spent on this puzzle. It stops when you solve or reveal it.</dd>
     <dt>Mistakes</dt>
@@ -580,7 +654,10 @@ var Sudoku = (function () {
   const notesBtn = document.getElementById("notesBtn");
   const autoBtn = document.getElementById("autoBtn");
   const eraseBtn = document.getElementById("eraseBtn");
+  const solveBtn = document.getElementById("solve");
   const digitButtons = Array.from(pad.querySelectorAll("[data-digit]"));
+  const splashEl = document.getElementById("splash");
+  const splashLevelButtons = Array.from(splashEl.querySelectorAll("[data-splash-level]"));
 
   const cells = [];
   for (let i = 0; i < 81; i++) {
@@ -627,6 +704,7 @@ var Sudoku = (function () {
   let animateSolve = false;               // fill the grid cell by cell when solving
   let solveTicker = null;                 // running solve animation
   let locked = false;                     // solved or revealed: read-only board
+  let started = false;                    // a difficulty has been chosen from the splash
   let errors = 0;                         // wrong digits entered this puzzle
   let startedAt = 0;
   let ticker = null;
@@ -662,9 +740,8 @@ var Sudoku = (function () {
     return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
   }
 
-  function setStatus(text, tone) {
+  function setStatus(text) {
     statusEl.textContent = text;
-    statusEl.className = "status" + (tone ? " " + tone : "");
   }
 
   function syncNotesButtons() {
@@ -674,12 +751,14 @@ var Sudoku = (function () {
 
   // Notes mode edits the marks; auto notes decides whether they are derived or hand-written.
   function setNotesMode(on) {
+    if (locked) return;
     notesMode = on;
     syncNotesButtons();
     render();
   }
 
   function setAutoNotes(on) {
+    if (locked) return;
     autoNotes = on;
     syncNotesButtons();
     render();
@@ -812,8 +891,11 @@ var Sudoku = (function () {
       filled++;
       if (values[i] === solution[i]) complete[values[i]]++;
     }
-    for (const btn of digitButtons) btn.disabled = complete[Number(btn.dataset.digit)] === 9;
+    for (const btn of digitButtons) btn.disabled = !started || complete[Number(btn.dataset.digit)] === 9;
     eraseBtn.disabled = locked || selected === null || puzzle[selected] !== 0 || values[selected] === solution[selected];
+    notesBtn.disabled = locked;
+    autoBtn.disabled = locked;
+    solveBtn.disabled = locked;
     remainingEl.textContent = String(81 - filled);
 
     for (let n = 0; n < mistakeEls.length; n++) mistakeEls[n].classList.toggle("is-lost", n < errors);
@@ -852,7 +934,27 @@ var Sudoku = (function () {
     clearInterval(ticker);
     ticker = null;
     timerEl.textContent = formatTime(elapsedMs === undefined ? Date.now() - startedAt : elapsedMs);
-    setStatus(message, tone);
+    setStatus(message);
+    notesMode = false;
+    syncNotesButtons();
+    render();
+  }
+
+  // Opening screen: an empty board that stays inert until a difficulty is chosen.
+  function boot() {
+    puzzle = new Array(81).fill(0);
+    solution = new Array(81).fill(0);
+    values = puzzle.slice();
+    notes = new Array(81).fill(0);
+    excluded = new Array(81).fill(0);
+    errors = 0;
+    selected = null;
+    locked = true;
+    started = false;
+    focusDigit = 0;
+    timerEl.textContent = "00:00";
+    document.querySelector("main").inert = true;   // nothing behind the splash is reachable
+    syncNotesButtons();
     render();
   }
 
@@ -868,6 +970,9 @@ var Sudoku = (function () {
     errors = 0;
     selected = null;
     locked = false;
+    started = true;
+    splashEl.hidden = true;
+    document.querySelector("main").inert = false;
     notesMode = false;
     focusDigit = 0;
     syncNotesButtons();
@@ -1013,7 +1118,7 @@ var Sudoku = (function () {
     else erase();
   });
 
-  document.getElementById("solve").addEventListener("click", reveal);
+  solveBtn.addEventListener("click", reveal);
 
   const helpDialog = document.getElementById("helpDialog");
   const optionsDialog = document.getElementById("optionsDialog");
@@ -1089,7 +1194,16 @@ var Sudoku = (function () {
     animateSolve = animateToggle.checked;
   });
 
-  newPuzzle();
+  for (const btn of splashLevelButtons) {
+    btn.addEventListener("click", () => {
+      level = btn.dataset.splashLevel;
+      newPuzzle();
+    });
+  }
+
+  document.getElementById("splashOptions").addEventListener("click", () => openDialog(optionsDialog));
+
+  boot();
 })();
 </script>
 </body>
