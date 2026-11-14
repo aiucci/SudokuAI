@@ -61,6 +61,34 @@
 
   .level-choice button.is-active { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
 
+  .mistakes {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  .mistakes-label {
+    margin-right: 3px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  .mistake {
+    font-weight: 700;
+    line-height: 1;
+    color: var(--muted);
+    opacity: 0.3;
+    transition: opacity 0.15s ease, color 0.15s ease;
+  }
+
+  .mistake.is-lost { color: var(--bad); opacity: 1; }
+
   .play {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 272px;
@@ -140,7 +168,7 @@
   .cell.is-pair { background: #e5e9f6; }
 
   .cell.is-peer { background: #f5f0e4; }
-  .cell.is-same { background: var(--accent-soft); }
+  .cell.is-same { background: #f7dcc8; }
   .cell.is-selected { background: #f1e7d7; box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
   .cell.is-given .value { color: var(--ink); font-weight: 700; }
   .cell.is-user .value { color: var(--user); }
@@ -270,6 +298,12 @@
     <div>
       <h1>SudokuAI</h1>
     </div>
+    <div class="mistakes" id="mistakes" role="status" aria-live="polite" aria-label="No mistakes">
+      <span class="mistakes-label">Mistakes</span>
+      <span class="mistake">X</span>
+      <span class="mistake">X</span>
+      <span class="mistake">X</span>
+    </div>
   </header>
 
   <section class="play">
@@ -286,7 +320,7 @@
         <button data-digit="7">7</button>
         <button data-digit="8">8</button>
         <button data-digit="9">9</button>
-        <button data-action="erase" class="wide">Erase</button>
+        <button data-action="erase" class="wide" id="eraseBtn">Erase</button>
         <button data-action="notes" class="wide" id="notesBtn" aria-pressed="false">Notes</button>
         <button data-action="auto" class="full" id="autoBtn" aria-pressed="false">Auto notes</button>
       </div>
@@ -325,7 +359,7 @@
     <dt>1–9</dt>
     <dd>Writes that digit in the selected cell. A filled cell is never overwritten — clear it with Erase first.</dd>
     <dt>Erase</dt>
-    <dd>Clears the selected cell: its value, its notes, and any candidates you crossed off. This is the only way to remove or change a placed number.</dd>
+    <dd>Clears the selected cell: a wrong number, its notes, and any candidates you crossed off. It stays disabled on givens and on numbers that are already correct.</dd>
     <dt>Notes</dt>
     <dd>Switches digit taps between filling cells and editing pencil marks.</dd>
     <dt>Auto notes</dt>
@@ -333,9 +367,11 @@
     <dt>Check</dt>
     <dd>Marks any cells that disagree with the solution.</dd>
     <dt>Solve</dt>
-    <dd>Fills in the whole solution and ends the puzzle.</dd>
+    <dd>Fills in the whole solution and ends the puzzle. Options can animate it cell by cell instead of revealing it at once.</dd>
     <dt>Time</dt>
     <dd>Time spent on this puzzle. It stops when you solve or reveal it.</dd>
+    <dt>Mistakes</dt>
+    <dd>The X marks in the top right turn red for each wrong number entered. A third mistake ends the game.</dd>
     <dt>Remaining</dt>
     <dd>How many cells are still empty, counting down as you go. Hidden until you turn it on in Options.</dd>
     <dt>Clues</dt>
@@ -343,7 +379,7 @@
     <dt>New puzzle</dt>
     <dd>Asks for a difficulty — Easy, Medium, Hard or Expert — then generates a puzzle at that level and restarts the timer. Cancel keeps the current game.</dd>
     <dt>Options</dt>
-    <dd>Opens the settings panel: switch off the highlighting of the selected number, row, column and box, show the clues counter or the remaining cell count, or mute the placement sounds.</dd>
+    <dd>Opens the settings panel: switch off the highlighting of the selected number, row, column and box, show the clues counter or the remaining cell count, mute the placement sounds, or animate Solve.</dd>
     <dt>Keyboard</dt>
     <dd>Arrow keys move, 1–9 enters a digit, Backspace / Delete / 0 clears, N toggles Notes, Esc closes this help.</dd>
   </dl>
@@ -367,6 +403,10 @@
   <label class="option">
     <input type="checkbox" id="optSound" checked>
     <span>Play a sound when a number is placed</span>
+  </label>
+  <label class="option">
+    <input type="checkbox" id="optAnimate">
+    <span>Animate the Solve button</span>
   </label>
   <button class="btn dialog-close" id="optionsClose">Close</button>
 </dialog>
@@ -534,10 +574,13 @@ var Sudoku = (function () {
   const timerEl = document.getElementById("timer");
   const cluesEl = document.getElementById("clues");
   const remainingEl = document.getElementById("remaining");
+  const mistakesEl = document.getElementById("mistakes");
+  const mistakeEls = Array.from(mistakesEl.querySelectorAll(".mistake"));
   const statusEl = document.getElementById("status");
   const pad = document.getElementById("pad");
   const notesBtn = document.getElementById("notesBtn");
   const autoBtn = document.getElementById("autoBtn");
+  const eraseBtn = document.getElementById("eraseBtn");
   const digitButtons = Array.from(pad.querySelectorAll("[data-digit]"));
 
   const cells = [];
@@ -579,9 +622,13 @@ var Sudoku = (function () {
   let notesMode = false;
   let autoNotes = false;                  // show derived candidates instead of manual marks
   let highlights = true;                  // shade peers and matching numbers on selection
+  let focusDigit = 0;                     // digit whose copies are highlighted
   let soundOn = true;                     // feedback tones for placed numbers
+  let animateSolve = false;               // fill the grid cell by cell when solving
+  let solveTicker = null;                 // running solve animation
   let locked = false;                     // solved or revealed: read-only board
   let flagged = new Set();                // cells the last Check found wrong
+  let errors = 0;                         // wrong digits entered this puzzle
   let startedAt = 0;
   let ticker = null;
 
@@ -604,6 +651,11 @@ var Sudoku = (function () {
       n++;
     }
     return n;
+  }
+
+  function errorText(n) {
+    if (!n) return "no errors";
+    return n + (n === 1 ? " error" : " errors");
   }
 
   function formatTime(ms) {
@@ -656,6 +708,34 @@ var Sudoku = (function () {
     osc.stop(start + duration + 0.02);
   }
 
+  // Slow falling growl, low-passed so it reads as a disappointed "boo".
+  function playBoo() {
+    if (!soundOn) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const now = audioCtx.currentTime;
+    for (const start of [196, 147]) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(start, now);
+      osc.frequency.exponentialRampToValueAtTime(start / 2, now + 0.85);
+      filter.type = "lowpass";
+      filter.frequency.value = 520;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 1.05);
+    }
+  }
+
   function playCorrect() {
     if (!soundOn) return;
     tone(659.25, 0.14, "sine", 0);        // E5
@@ -666,6 +746,41 @@ var Sudoku = (function () {
     if (!soundOn) return;
     tone(196, 0.18, "triangle", 0);       // G3
     tone(146.83, 0.22, "triangle", 0.11); // D3, a low fall
+  }
+
+  // Scattered noise bursts through a band-pass read as a small round of applause.
+  function playApplause() {
+    if (!soundOn) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const rate = audioCtx.sampleRate;
+    const seconds = 1.5;
+    const buffer = audioCtx.createBuffer(1, Math.floor(rate * seconds), rate);
+    const data = buffer.getChannelData(0);
+    for (let clap = 0; clap < 12; clap++) {
+      const start = Math.random() * (seconds - 0.25);
+      const length = 0.04 + Math.random() * 0.07;
+      for (let n = 0; n < length * rate; n++) {
+        const index = Math.floor((start + n / rate) * rate);
+        if (index >= data.length) break;
+        data[index] += (Math.random() * 2 - 1) * Math.exp(-(n / rate) * 28) * 0.55;
+      }
+    }
+    const source = audioCtx.createBufferSource();
+    const filter = audioCtx.createBiquadFilter();
+    const gain = audioCtx.createGain();
+    source.buffer = buffer;
+    filter.type = "bandpass";
+    filter.frequency.value = 1600;
+    filter.Q.value = 0.7;
+    gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + seconds);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
   }
 
   function render() {
@@ -685,7 +800,7 @@ var Sudoku = (function () {
     }
     for (const i of flagged) bad.add(i);
 
-    const focusValue = selected === null ? 0 : values[selected];
+    const focusValue = focusDigit;
 
     // A digit is finished once all nine of its cells hold their correct value.
     const complete = new Array(10).fill(0);
@@ -696,7 +811,11 @@ var Sudoku = (function () {
       if (values[i] === solution[i]) complete[values[i]]++;
     }
     for (const btn of digitButtons) btn.disabled = complete[Number(btn.dataset.digit)] === 9;
+    eraseBtn.disabled = locked || selected === null || puzzle[selected] !== 0 || values[selected] === solution[selected];
     remainingEl.textContent = String(81 - filled);
+
+    for (let n = 0; n < mistakeEls.length; n++) mistakeEls[n].classList.toggle("is-lost", n < errors);
+    mistakesEl.setAttribute("aria-label", errors ? errors + " of 3 mistakes" : "No mistakes");
 
     for (let i = 0; i < 81; i++) {
       const cell = cells[i];
@@ -726,16 +845,18 @@ var Sudoku = (function () {
   }
 
   // Freeze the clock, lock the board and report why.
-  function finish(message, tone) {
+  function finish(message, tone, elapsedMs) {
     locked = true;
     clearInterval(ticker);
     ticker = null;
-    timerEl.textContent = formatTime(Date.now() - startedAt);
+    timerEl.textContent = formatTime(elapsedMs === undefined ? Date.now() - startedAt : elapsedMs);
     setStatus(message, tone);
     render();
   }
 
   function newPuzzle() {
+    clearInterval(solveTicker);
+    solveTicker = null;
     const generated = Sudoku.generate(level);
     puzzle = generated.puzzle;
     solution = generated.solution;
@@ -743,9 +864,11 @@ var Sudoku = (function () {
     notes = new Array(81).fill(0);
     excluded = new Array(81).fill(0);
     flagged = new Set();
+    errors = 0;
     selected = null;
     locked = false;
     notesMode = false;
+    focusDigit = 0;
     syncNotesButtons();
     cluesEl.textContent = String(generated.clues);
     setStatus("");
@@ -760,7 +883,15 @@ var Sudoku = (function () {
   }
 
   function place(digit) {
-    if (locked || selected === null || puzzle[selected]) return;
+    if (locked || selected === null) return;
+
+    // A digit that can't be written still becomes the highlighted digit.
+    if (puzzle[selected] || values[selected]) {
+      focusDigit = digit;
+      render();
+      return;
+    }
+
     const i = selected;
 
     if (notesMode) {
@@ -772,23 +903,33 @@ var Sudoku = (function () {
         notes[i] ^= bit;
       }
     } else {
-      if (values[i]) return;              // filled cells are only cleared with Erase
       values[i] = digit;
       notes[i] = 0;
+      focusDigit = digit;
       if (digit === solution[i]) playCorrect();
-      else playWrong();
+      else {
+        errors++;
+        playWrong();
+      }
     }
 
     flagged.delete(i);
     render();
 
+    if (errors >= 3) {
+      finish("Three mistakes — this game is over. Press New puzzle to try again.", "bad");
+      playBoo();
+      return;
+    }
+
     if (values.every((v, n) => v === solution[n])) {
-      finish("Solved in " + formatTime(Date.now() - startedAt) + ". Nice work.", "good");
+      finish("Solved in " + formatTime(Date.now() - startedAt) + " with " + errorText(errors) + ".", "good");
+      if (errors < 3) playApplause();
     }
   }
 
   function erase() {
-    if (locked || selected === null || puzzle[selected]) return;
+    if (locked || selected === null || puzzle[selected] || values[selected] === solution[selected]) return;
     values[selected] = 0;
     notes[selected] = 0;
     excluded[selected] = 0;
@@ -813,10 +954,37 @@ var Sudoku = (function () {
   }
 
   function reveal() {
-    if (locked) return;
-    values = solution.slice();
+    if (locked || solveTicker) return;
+
+    if (!animateSolve) {
+      values = solution.slice();
+      flagged = new Set();
+      finish("Solution revealed. Press New puzzle for a fresh grid.");
+      return;
+    }
+
+    // Animated reveal: freeze the clock and the board, then fill row by row.
+    clearInterval(ticker);
+    ticker = null;
+    const elapsed = Date.now() - startedAt;
+    timerEl.textContent = formatTime(elapsed);
+    locked = true;
     flagged = new Set();
-    finish("Solution revealed. Press New puzzle for a fresh grid.");
+    setStatus("Solving…");
+    render();
+
+    const remaining = [...Array(81).keys()].filter((i) => !values[i]);
+    let step = 0;
+    solveTicker = setInterval(() => {
+      if (step >= remaining.length) {
+        clearInterval(solveTicker);
+        solveTicker = null;
+        finish("Solution revealed in " + formatTime(elapsed) + ". Press New puzzle for a fresh grid.", null, elapsed);
+        return;
+      }
+      values[remaining[step++]] = solution[remaining[step - 1]];
+      render();
+    }, 35);
   }
 
   function move(dr, dc) {
@@ -831,6 +999,7 @@ var Sudoku = (function () {
     const el = event.target.closest(".cell");
     if (!el) return;
     selected = [...board.children].indexOf(el);
+    if (values[selected]) focusDigit = values[selected];
     board.focus({ preventScroll: true });
     render();
   });
@@ -921,6 +1090,11 @@ var Sudoku = (function () {
   const soundToggle = document.getElementById("optSound");
   soundToggle.addEventListener("change", () => {
     soundOn = soundToggle.checked;
+  });
+
+  const animateToggle = document.getElementById("optAnimate");
+  animateToggle.addEventListener("change", () => {
+    animateSolve = animateToggle.checked;
   });
 
   newPuzzle();
