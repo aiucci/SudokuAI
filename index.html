@@ -61,11 +61,22 @@
 
   .level-choice button.is-active { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
 
-  .mistakes {
+  .win-summary { margin: 0 0 4px; font-size: 0.92rem; font-weight: 600; color: var(--good); }
+  .win-prompt { margin: 0 0 14px; font-size: 0.82rem; color: var(--muted); }
+
+  .corner {
     position: fixed;
-    top: 12px;
-    right: 12px;
+    top: clamp(10px, 1.2vw, 16px);
+    right: clamp(10px, 1.2vw, 16px);
     z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .corner .meta { padding: 8px 12px; }
+
+  .mistakes {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -89,8 +100,8 @@
 
   .play {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 272px;
-    gap: 26px;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 26vw, 300px);
+    gap: clamp(16px, 2vw, 26px);
     align-items: start;
   }
 
@@ -99,6 +110,10 @@
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
     width: 100%;
+    /* Never taller than the window allows, so the board and the pad fit together. */
+    max-width: calc(100vh - 185px);
+    max-width: calc(100dvh - 185px);
+    justify-self: center;
     aspect-ratio: 1 / 1;
     container-type: inline-size;
     background: var(--panel);
@@ -240,7 +255,6 @@
   .pad button:hover:not(:disabled) { background: #f6f0e4; }
   .pad button:disabled { opacity: 0.35; cursor: default; }
   .pad button.wide { grid-column: span 3; font-size: 0.88rem; }
-  .pad button.full { grid-column: span 6; font-size: 0.88rem; }
   #notesBtn[aria-pressed="true"],
   #autoBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 
@@ -266,6 +280,7 @@
   .dialog dt { margin-top: 10px; font-weight: 600; }
   .dialog dd { margin: 2px 0 0; color: var(--muted); }
   .dialog-close { flex: none; align-self: flex-start; }
+  #levelCancel { align-self: center; }
 
   .option {
     display: flex;
@@ -345,9 +360,11 @@
   #splashOptions { width: 100%; }
   .splash .btn:hover:not(:disabled) { transform: none; }
 
-  @media (max-width: 820px) {
+  /* Phones stack; tablets keep the pad beside the board. */
+  @media (max-width: 700px) {
     body { padding: 24px 16px 40px; }
     .play { grid-template-columns: 1fr; gap: 20px; }
+    .board { max-width: 100%; }
     .side { max-width: 520px; }
   }
 </style>
@@ -358,12 +375,18 @@
     <div>
       <h1>SudokuAI</h1>
     </div>
+  </header>
+
+  <div class="corner">
+    <div class="meta" id="timeField" role="timer" aria-label="Elapsed time">
+      <span class="metric" id="timer">00:00</span>
+    </div>
     <div class="mistakes" id="mistakes" role="status" aria-live="polite" aria-label="No mistakes">
       <span class="mistake">X</span>
       <span class="mistake">X</span>
       <span class="mistake">X</span>
     </div>
-  </header>
+  </div>
 
   <section class="play">
     <div class="board" id="board" role="grid" aria-label="Sudoku board" tabindex="0"></div>
@@ -379,9 +402,8 @@
         <button data-digit="7">7</button>
         <button data-digit="8">8</button>
         <button data-digit="9">9</button>
-        <button data-action="erase" class="wide" id="eraseBtn">Erase</button>
         <button data-action="notes" class="wide" id="notesBtn" aria-pressed="false">Notes</button>
-        <button data-action="auto" class="full" id="autoBtn" aria-pressed="false">Auto notes</button>
+        <button data-action="auto" class="wide" id="autoBtn" aria-pressed="false">Auto notes</button>
       </div>
 
       <div class="checks">
@@ -390,10 +412,6 @@
         <button class="btn" id="options">Options</button>
       </div>
 
-      <div class="meta">
-        <span class="meta-label">Time</span>
-        <span class="metric" id="timer">00:00</span>
-      </div>
       <div class="meta" id="remainingField" hidden>
         <span class="meta-label">Remaining</span>
         <span class="metric" id="remaining">—</span>
@@ -428,9 +446,7 @@
   <h2 id="helpTitle" tabindex="-1">What each control does</h2>
   <dl>
     <dt>1–9</dt>
-    <dd>Writes that digit in the selected cell. A filled cell is never overwritten — clear it with Erase first. A wrong digit turns red on the spot and counts as a mistake.</dd>
-    <dt>Erase</dt>
-    <dd>Clears the selected cell: a wrong number, its notes, and any candidates you crossed off. It stays disabled on givens and on numbers that are already correct.</dd>
+    <dd>Writes that digit in the selected cell. Givens and numbers that are already correct are fixed; a wrong digit turns red on the spot, counts as a mistake, and can simply be typed over with a new one.</dd>
     <dt>Notes</dt>
     <dd>Switches digit taps between filling cells and editing pencil marks. It greys out once the game is over or solved.</dd>
     <dt>Auto notes</dt>
@@ -438,7 +454,7 @@
     <dt>Solve</dt>
     <dd>Fills in the whole solution and ends the puzzle. Options can animate it cell by cell instead of revealing it at once. It greys out once the game is over.</dd>
     <dt>Time</dt>
-    <dd>Time spent on this puzzle. It stops when you solve or reveal it.</dd>
+    <dd>Shown beside the mistake marks in the top right. It stops when you solve or reveal the puzzle, and Options can hide it.</dd>
     <dt>Mistakes</dt>
     <dd>The X marks in the top right turn red for each wrong number entered. A third mistake ends the game.</dd>
     <dt>Remaining</dt>
@@ -448,9 +464,9 @@
     <dt>New puzzle</dt>
     <dd>Asks for a difficulty — Easy, Medium, Hard or Expert — then generates a puzzle at that level and restarts the timer. Cancel keeps the current game.</dd>
     <dt>Options</dt>
-    <dd>Opens the settings panel: turn the row, column and box highlighting on or off (it starts off), do the same for the cells already holding the selected number (they start highlighted), show the clues counter or the remaining cell count, mute the placement sounds, or animate Solve.</dd>
+    <dd>Opens the settings panel: turn the row, column and box highlighting on or off (it starts off), do the same for the cells already holding the selected number (they start highlighted), show or hide the time (it starts shown), show the clues counter or the remaining cell count, mute the placement sounds, or animate Solve.</dd>
     <dt>Keyboard</dt>
-    <dd>Arrow keys move, 1–9 enters a digit, Backspace / Delete / 0 clears, N toggles Notes, Esc closes this help.</dd>
+    <dd>Arrow keys move, 1–9 enters a digit, N toggles Notes, Esc closes this help.</dd>
   </dl>
   <button class="btn dialog-close" id="helpClose">Close</button>
 </dialog>
@@ -464,6 +480,10 @@
   <label class="option">
     <input type="checkbox" id="optSame" checked>
     <span>Highlight cells already holding the selected number</span>
+  </label>
+  <label class="option">
+    <input type="checkbox" id="optTime" checked>
+    <span>Show the time</span>
   </label>
   <label class="option">
     <input type="checkbox" id="optClues">
@@ -493,6 +513,19 @@
     <button class="btn" data-level="expert">Expert</button>
   </div>
   <button class="btn dialog-close" id="levelCancel">Cancel</button>
+</dialog>
+
+<dialog class="dialog" id="winDialog" aria-labelledby="winTitle">
+  <h2 id="winTitle" tabindex="-1">You solved it</h2>
+  <p class="win-summary" id="winSummary"></p>
+  <p class="win-prompt">Choose a difficulty for the next puzzle</p>
+  <div class="level-choice">
+    <button class="btn" data-level="easy">Easy</button>
+    <button class="btn" data-level="medium">Medium</button>
+    <button class="btn" data-level="hard">Hard</button>
+    <button class="btn" data-level="expert">Expert</button>
+  </div>
+  <button class="btn dialog-close" id="winClose">Close</button>
 </dialog>
 
 <script>
@@ -653,9 +686,10 @@ var Sudoku = (function () {
   const pad = document.getElementById("pad");
   const notesBtn = document.getElementById("notesBtn");
   const autoBtn = document.getElementById("autoBtn");
-  const eraseBtn = document.getElementById("eraseBtn");
+  const timeField = document.getElementById("timeField");
   const solveBtn = document.getElementById("solve");
   const digitButtons = Array.from(pad.querySelectorAll("[data-digit]"));
+  const shellEl = document.querySelector("main");
   const splashEl = document.getElementById("splash");
   const splashLevelButtons = Array.from(splashEl.querySelectorAll("[data-splash-level]"));
 
@@ -767,21 +801,43 @@ var Sudoku = (function () {
   // Feedback tones, synthesised on the fly so the page stays a single file.
   let audioCtx = null;
 
-  function tone(frequency, duration, type, delay) {
+  function audioContext() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
+    if (!Ctx) return null;
     if (!audioCtx) audioCtx = new Ctx();
     if (audioCtx.state === "suspended") audioCtx.resume();
-    const start = audioCtx.currentTime + delay;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    return audioCtx;
+  }
+
+  // iPadOS keeps every AudioContext suspended until a real gesture runs inside it,
+  // so open it on the first touch and push a silent sample through to unlock output.
+  function unlockAudio() {
+    const ctx = audioContext();
+    if (!ctx) return;
+    const silent = ctx.createBufferSource();
+    silent.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    silent.connect(ctx.destination);
+    silent.start(0);
+  }
+
+  window.addEventListener("pointerdown", unlockAudio, { once: true });
+  window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
+  window.addEventListener("keydown", unlockAudio, { once: true });
+  window.addEventListener("click", unlockAudio, { once: true });
+
+  function tone(frequency, duration, type, delay) {
+    const ctx = audioContext();
+    if (!ctx) return;
+    const start = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(frequency, start);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(ctx.destination);
     osc.start(start);
     osc.stop(start + duration + 0.02);
   }
@@ -789,15 +845,13 @@ var Sudoku = (function () {
   // Slow falling growl, low-passed so it reads as a disappointed "boo".
   function playBoo() {
     if (!soundOn) return;
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    if (!audioCtx) audioCtx = new Ctx();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    const now = audioCtx.currentTime;
+    const ctx = audioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
     for (const start of [196, 147]) {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(start, now);
       osc.frequency.exponentialRampToValueAtTime(start / 2, now + 0.85);
@@ -808,7 +862,7 @@ var Sudoku = (function () {
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 1);
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 1.05);
     }
@@ -829,13 +883,11 @@ var Sudoku = (function () {
   // Scattered noise bursts through a band-pass read as a small round of applause.
   function playApplause() {
     if (!soundOn) return;
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    if (!audioCtx) audioCtx = new Ctx();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    const rate = audioCtx.sampleRate;
+    const ctx = audioContext();
+    if (!ctx) return;
+    const rate = ctx.sampleRate;
     const seconds = 1.5;
-    const buffer = audioCtx.createBuffer(1, Math.floor(rate * seconds), rate);
+    const buffer = ctx.createBuffer(1, Math.floor(rate * seconds), rate);
     const data = buffer.getChannelData(0);
     for (let clap = 0; clap < 12; clap++) {
       const start = Math.random() * (seconds - 0.25);
@@ -846,18 +898,18 @@ var Sudoku = (function () {
         data[index] += (Math.random() * 2 - 1) * Math.exp(-(n / rate) * 28) * 0.55;
       }
     }
-    const source = audioCtx.createBufferSource();
-    const filter = audioCtx.createBiquadFilter();
-    const gain = audioCtx.createGain();
+    const source = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
     source.buffer = buffer;
     filter.type = "bandpass";
     filter.frequency.value = 1600;
     filter.Q.value = 0.7;
-    gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + seconds);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + seconds);
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(ctx.destination);
     source.start();
   }
 
@@ -891,8 +943,7 @@ var Sudoku = (function () {
       filled++;
       if (values[i] === solution[i]) complete[values[i]]++;
     }
-    for (const btn of digitButtons) btn.disabled = !started || complete[Number(btn.dataset.digit)] === 9;
-    eraseBtn.disabled = locked || selected === null || puzzle[selected] !== 0 || values[selected] === solution[selected];
+    for (const btn of digitButtons) btn.disabled = !started || locked || complete[Number(btn.dataset.digit)] === 9;
     notesBtn.disabled = locked;
     autoBtn.disabled = locked;
     solveBtn.disabled = locked;
@@ -929,7 +980,7 @@ var Sudoku = (function () {
   }
 
   // Freeze the clock, lock the board and report why.
-  function finish(message, tone, elapsedMs) {
+  function finish(message, elapsedMs) {
     locked = true;
     clearInterval(ticker);
     ticker = null;
@@ -938,6 +989,13 @@ var Sudoku = (function () {
     notesMode = false;
     syncNotesButtons();
     render();
+  }
+
+  // A finished puzzle offers the next one, with the current difficulty pre-selected.
+  function openWin(message) {
+    winSummary.textContent = message;
+    syncLevelButtons();
+    openDialog(winDialog);
   }
 
   // Opening screen: an empty board that stays inert until a difficulty is chosen.
@@ -953,7 +1011,7 @@ var Sudoku = (function () {
     started = false;
     focusDigit = 0;
     timerEl.textContent = "00:00";
-    document.querySelector("main").inert = true;   // nothing behind the splash is reachable
+    shellEl.inert = true;                  // nothing behind the splash is reachable
     syncNotesButtons();
     render();
   }
@@ -972,7 +1030,7 @@ var Sudoku = (function () {
     locked = false;
     started = true;
     splashEl.hidden = true;
-    document.querySelector("main").inert = false;
+    shellEl.inert = false;
     notesMode = false;
     focusDigit = 0;
     syncNotesButtons();
@@ -990,17 +1048,18 @@ var Sudoku = (function () {
 
   function place(digit) {
     if (locked || selected === null) return;
+    const i = selected;
 
-    // A digit that can't be written still becomes the highlighted digit.
-    if (puzzle[selected] || values[selected]) {
+    // Givens and correct numbers are fixed; tapping their digit only highlights it.
+    if (puzzle[i] || values[i] === solution[i]) {
       focusDigit = digit;
       render();
       return;
     }
 
-    const i = selected;
+    const replacing = values[i] !== 0;      // a wrong entry can simply be typed over
 
-    if (notesMode) {
+    if (notesMode && !replacing) {
       const bit = 1 << (digit - 1);
       if (autoNotes) {
         // Only legal candidates can be toggled, so a mark never contradicts the board.
@@ -1011,6 +1070,7 @@ var Sudoku = (function () {
     } else {
       values[i] = digit;
       notes[i] = 0;
+      excluded[i] = 0;
       focusDigit = digit;
       if (digit === solution[i]) playCorrect();
       else {
@@ -1022,23 +1082,17 @@ var Sudoku = (function () {
     render();
 
     if (errors >= 3) {
-      finish("Three mistakes — this game is over. Press New puzzle to try again.", "bad");
+      finish("Three mistakes — this game is over. Press New puzzle to try again.");
       playBoo();
       return;
     }
 
     if (values.every((v, n) => v === solution[n])) {
-      finish("Solved in " + formatTime(Date.now() - startedAt) + " with " + errorText(errors) + ".", "good");
+      const summary = "Solved in " + formatTime(Date.now() - startedAt) + " with " + errorText(errors) + ".";
+      finish(summary);
       if (errors < 3) playApplause();
+      openWin(summary);
     }
-  }
-
-  function erase() {
-    if (locked || selected === null || puzzle[selected] || values[selected] === solution[selected]) return;
-    values[selected] = 0;
-    notes[selected] = 0;
-    excluded[selected] = 0;
-    render();
   }
 
   function reveal() {
@@ -1060,7 +1114,7 @@ var Sudoku = (function () {
     render();
 
     const remaining = [...Array(81).keys()].filter((i) => !values[i]);
-    const done = () => finish("Solution revealed in " + formatTime(elapsed) + ". Press New puzzle for a fresh grid.", null, elapsed);
+    const done = () => finish("Solution revealed in " + formatTime(elapsed) + ". Press New puzzle for a fresh grid.", elapsed);
     if (!remaining.length) {
       done();
       return;
@@ -1099,7 +1153,6 @@ var Sudoku = (function () {
   board.addEventListener("keydown", (event) => {
     const key = event.key;
     if (/^[1-9]$/.test(key)) place(Number(key));
-    else if (key === "Backspace" || key === "Delete" || key === "0") erase();
     else if (key === "n" || key === "N") setNotesMode(!notesMode);
     else if (key === "ArrowUp") move(-1, 0);
     else if (key === "ArrowDown") move(1, 0);
@@ -1115,7 +1168,6 @@ var Sudoku = (function () {
     if (btn.dataset.digit) place(Number(btn.dataset.digit));
     else if (btn.dataset.action === "notes") setNotesMode(!notesMode);
     else if (btn.dataset.action === "auto") setAutoNotes(!autoNotes);
-    else erase();
   });
 
   solveBtn.addEventListener("click", reveal);
@@ -1124,13 +1176,16 @@ var Sudoku = (function () {
   const optionsDialog = document.getElementById("optionsDialog");
   const levelDialog = document.getElementById("levelDialog");
   const levelButtons = Array.from(levelDialog.querySelectorAll("[data-level]"));
+  const winDialog = document.getElementById("winDialog");
+  const winSummary = document.getElementById("winSummary");
+  const winLevelButtons = Array.from(winDialog.querySelectorAll("[data-level]"));
 
   function openDialog(dialog) {
     dialog.showModal();
     dialog.querySelector("h2").focus();   // read from the top, not from the Close button
   }
 
-  for (const dialog of [helpDialog, optionsDialog, levelDialog]) {
+  for (const dialog of [helpDialog, optionsDialog, levelDialog, winDialog]) {
     dialog.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();   // click the backdrop to dismiss
@@ -1138,17 +1193,17 @@ var Sudoku = (function () {
   }
 
   function syncLevelButtons() {
-    for (const btn of levelButtons) {
+    for (const btn of levelButtons.concat(winLevelButtons)) {
       const active = btn.dataset.level === level;
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-pressed", String(active));
     }
   }
 
-  for (const btn of levelButtons) {
+  for (const btn of levelButtons.concat(winLevelButtons)) {
     btn.addEventListener("click", () => {
       level = btn.dataset.level;
-      levelDialog.close();
+      btn.closest("dialog").close();
       newPuzzle();
     });
   }
@@ -1166,6 +1221,11 @@ var Sudoku = (function () {
     render();
   });
 
+  const timeToggle = document.getElementById("optTime");
+  timeToggle.addEventListener("change", () => {
+    timeField.hidden = !timeToggle.checked;
+  });
+
   const cluesField = document.getElementById("cluesField");
   const cluesToggle = document.getElementById("optClues");
   cluesToggle.addEventListener("change", () => {
@@ -1181,6 +1241,7 @@ var Sudoku = (function () {
   const soundToggle = document.getElementById("optSound");
   soundToggle.addEventListener("change", () => {
     soundOn = soundToggle.checked;
+    if (soundOn) unlockAudio();
   });
 
   const sameToggle = document.getElementById("optSame");
