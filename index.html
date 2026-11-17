@@ -7,6 +7,7 @@
 <style>
   :root {
     --paper: #f3efe6;
+    --paper-top: #fbf8f0;
     --panel: #fffdf8;
     --ink: #232a31;
     --muted: #7c8593;
@@ -17,6 +18,57 @@
     --user: #1c6e6a;
     --bad: #b33424;
     --good: #2f7d4f;
+    --cell-peer: #f5f0e4;
+    --cell-same: #f7dcc8;
+    --cell-selected: #f1e7d7;
+    --cell-bad: #fbe6e2;
+    --cell-single: #e3efe5;
+    --cell-pair: #e5e9f6;
+    --hover: #f6f0e4;
+    --hover-border: #bdb5a3;
+    --primary-bg: var(--ink);
+    --primary-ink: #fdfbf5;
+    --primary-hover: #323b45;
+    --on-accent: #fff;
+    --splash-bg: rgba(243, 239, 230, 0.94);
+    --shadow-soft: 0 3px 12px rgba(40, 32, 24, 0.08);
+    --shadow-board: 0 18px 40px -30px rgba(35, 42, 49, 0.7);
+    --shadow-strong: 0 24px 60px -30px rgba(35, 42, 49, 0.8);
+    --backdrop: rgba(35, 42, 49, 0.35);
+  }
+
+  /* Dark mode: near-black paper, dim panels, softer highlight tints. */
+  body.dark {
+    color-scheme: dark;
+    --paper: #0f1215;
+    --paper-top: #171b1f;
+    --panel: #1a1e23;
+    --ink: #e6eaee;
+    --muted: #8e98a4;
+    --line: #2b3138;
+    --strong-line: #4d5661;
+    --accent: #d1703f;
+    --accent-soft: #3a2a22;
+    --user: #58b3aa;
+    --bad: #e87663;
+    --good: #5fbd88;
+    --cell-peer: #22272d;
+    --cell-same: #43301f;
+    --cell-selected: #3a3630;
+    --cell-bad: #3a2421;
+    --cell-single: #1f2e26;
+    --cell-pair: #202a38;
+    --hover: #262c33;
+    --hover-border: #4a525c;
+    --primary-bg: #e6eaee;
+    --primary-ink: #12151a;
+    --primary-hover: #f7f9fb;
+    --on-accent: #101316;
+    --splash-bg: rgba(9, 11, 14, 0.95);
+    --shadow-soft: 0 3px 12px rgba(0, 0, 0, 0.5);
+    --shadow-board: 0 18px 40px -30px rgba(0, 0, 0, 0.9);
+    --shadow-strong: 0 24px 60px -30px rgba(0, 0, 0, 0.95);
+    --backdrop: rgba(0, 0, 0, 0.6);
   }
 
   * { box-sizing: border-box; }
@@ -28,7 +80,7 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    background: radial-gradient(1200px 620px at 12% -12%, #fbf8f0, var(--paper));
+    background: radial-gradient(1200px 620px at 12% -12%, var(--paper-top), var(--paper));
     color: var(--ink);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -47,10 +99,13 @@
   h1 {
     margin: 0 0 4px;
     font-family: ui-serif, Georgia, "Times New Roman", serif;
-    font-size: clamp(2rem, 4vw, 2.6rem);
+    font-size: clamp(1.6rem, 3.2vw, 2.15rem);
     font-weight: 600;
     letter-spacing: -0.02em;
   }
+
+  /* The title keeps its own width, so the clock wraps underneath instead of colliding. */
+  .head > div { flex: 0 0 auto; }
 
   .level-choice {
     display: grid;
@@ -59,22 +114,27 @@
     margin: 0 0 18px;
   }
 
-  .level-choice button.is-active { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
+  .level-choice button.is-active { background: var(--primary-bg); border-color: var(--primary-bg); color: var(--primary-ink); }
 
   .win-summary { margin: 0 0 4px; font-size: 0.92rem; font-weight: 600; color: var(--good); }
+  .win-best { margin: 0 0 12px; font-size: 0.82rem; color: var(--muted); }
+  .win-best[hidden] { display: none; }
   .win-prompt { margin: 0 0 14px; font-size: 0.82rem; color: var(--muted); }
 
+  .stats { margin: 2px 0 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .stats-title { margin: 0 0 8px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+  .stats-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 0.85rem; }
+  .stats-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stats-reset { align-self: flex-start; margin-top: 10px; padding: 8px 12px; font-size: 0.8rem; }
+
   .corner {
-    position: fixed;
-    top: clamp(10px, 1.2vw, 16px);
-    right: clamp(10px, 1.2vw, 16px);
-    z-index: 6;
     display: flex;
     align-items: center;
     gap: 8px;
   }
 
   .corner .meta { padding: 8px 12px; }
+  #levelMetric { text-transform: capitalize; }
 
   .mistakes {
     display: flex;
@@ -84,7 +144,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 10px;
-    box-shadow: 0 3px 12px rgba(40, 32, 24, 0.08);
+    box-shadow: var(--shadow-soft);
   }
 
   .mistake {
@@ -122,7 +182,7 @@
     overflow: hidden;
     outline: none;
     user-select: none;
-    box-shadow: 0 18px 40px -30px rgba(35, 42, 49, 0.7);
+    box-shadow: var(--shadow-board);
   }
 
   .board:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -177,15 +237,15 @@
   .notes span.on { opacity: 1; }
 
   /* Auto-note hints: green for a lone candidate, blue for a two-candidate cell. */
-  .cell.is-single { background: #e3efe5; }
-  .cell.is-pair { background: #e5e9f6; }
+  .cell.is-single { background: var(--cell-single); }
+  .cell.is-pair { background: var(--cell-pair); }
 
-  .cell.is-peer { background: #f5f0e4; }
-  .cell.is-same { background: #f7dcc8; }
-  .cell.is-selected { background: #f1e7d7; box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
+  .cell.is-peer { background: var(--cell-peer); }
+  .cell.is-same { background: var(--cell-same); }
+  .cell.is-selected { background: var(--cell-selected); box-shadow: inset 0 0 0 2px var(--accent); z-index: 2; }
   .cell.is-given .value { color: var(--ink); font-weight: 700; }
   .cell.is-user .value { color: var(--user); }
-  .cell.is-bad { background: #fbe6e2; }
+  .cell.is-bad { background: var(--cell-bad); }
   .cell.is-bad .value { color: var(--bad); font-weight: 700; }
 
   .side { display: flex; flex-direction: column; gap: 12px; }
@@ -227,10 +287,10 @@
     transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
   }
 
-  .btn:hover:not(:disabled) { border-color: #bdb5a3; transform: translateY(-1px); }
+  .btn:hover:not(:disabled) { border-color: var(--hover-border); transform: translateY(-1px); }
   .btn:disabled { opacity: 0.35; cursor: default; }
-  .btn-primary { background: var(--ink); border-color: var(--ink); color: #fdfbf5; }
-  .btn-primary:hover { background: #323b45; border-color: #323b45; }
+  .btn-primary { background: var(--primary-bg); border-color: var(--primary-bg); color: var(--primary-ink); }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 
   .pad {
     display: grid;
@@ -252,11 +312,11 @@
     transition: background 0.14s ease;
   }
 
-  .pad button:hover:not(:disabled) { background: #f6f0e4; }
+  .pad button:hover:not(:disabled) { background: var(--hover); }
   .pad button:disabled { opacity: 0.35; cursor: default; }
   .pad button.wide { grid-column: span 3; font-size: 0.88rem; }
   #notesBtn[aria-pressed="true"],
-  #autoBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #autoBtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
   .checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .checks .btn.full { grid-column: 1 / -1; }
@@ -269,10 +329,10 @@
     border-radius: 14px;
     background: var(--panel);
     color: var(--ink);
-    box-shadow: 0 24px 60px -30px rgba(35, 42, 49, 0.8);
+    box-shadow: var(--shadow-strong);
   }
 
-  .dialog::backdrop { background: rgba(35, 42, 49, 0.35); }
+  .dialog::backdrop { background: var(--backdrop); }
   .dialog[open] { display: flex; flex-direction: column; }
   .dialog h2 { margin: 0 0 14px; font-size: 1.1rem; flex: none; }
   .dialog h2:focus { outline: none; }
@@ -316,7 +376,7 @@
     align-items: center;
     justify-content: center;
     padding: clamp(16px, 4vw, 40px);
-    background: rgba(243, 239, 230, 0.94);
+    background: var(--splash-bg);
     animation: splash-in 0.4s ease both;
   }
 
@@ -331,7 +391,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 18px;
-    box-shadow: 0 30px 70px -40px rgba(35, 42, 49, 0.75);
+    box-shadow: var(--shadow-strong);
   }
 
   .splash-card h1 { margin: 0 0 6px; font-size: clamp(2.1rem, 6vw, 2.7rem); }
@@ -356,7 +416,9 @@
     transition: background 0.14s ease, border-color 0.14s ease;
   }
 
-  .splash-levels button:hover { background: #f6f0e4; border-color: #bdb5a3; }
+  .splash-levels button:hover { background: var(--hover); border-color: var(--hover-border); }
+  .splash-stats { margin: 0 0 14px; font-size: 0.74rem; line-height: 1.5; color: var(--muted); }
+  .splash-stats[hidden] { display: none; }
   #splashOptions { width: 100%; }
   .splash .btn:hover:not(:disabled) { transform: none; }
 
@@ -375,18 +437,20 @@
     <div>
       <h1>SudokuAI</h1>
     </div>
+    <div class="corner">
+      <div class="meta" id="timeField" role="timer" aria-label="Elapsed time">
+        <span class="metric" id="timer">00:00</span>
+      </div>
+      <div class="meta" id="levelField" aria-label="Difficulty">
+        <span class="metric" id="levelMetric">—</span>
+      </div>
+      <div class="mistakes" id="mistakes" role="status" aria-live="polite" aria-label="No mistakes">
+        <span class="mistake">X</span>
+        <span class="mistake">X</span>
+        <span class="mistake">X</span>
+      </div>
+    </div>
   </header>
-
-  <div class="corner">
-    <div class="meta" id="timeField" role="timer" aria-label="Elapsed time">
-      <span class="metric" id="timer">00:00</span>
-    </div>
-    <div class="mistakes" id="mistakes" role="status" aria-live="polite" aria-label="No mistakes">
-      <span class="mistake">X</span>
-      <span class="mistake">X</span>
-      <span class="mistake">X</span>
-    </div>
-  </div>
 
   <section class="play">
     <div class="board" id="board" role="grid" aria-label="Sudoku board" tabindex="0"></div>
@@ -438,6 +502,7 @@
       <button data-splash-level="hard">Hard</button>
       <button data-splash-level="expert">Expert</button>
     </div>
+    <p class="splash-stats" id="splashStats" hidden></p>
     <button class="btn" id="splashOptions">Options</button>
   </div>
 </div>
@@ -455,6 +520,8 @@
     <dd>Fills in the whole solution and ends the puzzle. Options can animate it cell by cell instead of revealing it at once. It greys out once the game is over.</dd>
     <dt>Time</dt>
     <dd>Shown beside the mistake marks in the top right. It stops when you solve or reveal the puzzle, and Options can hide it.</dd>
+    <dt>Difficulty</dt>
+    <dd>The level of the current puzzle, shown between the clock and the mistake marks. Options can hide it.</dd>
     <dt>Mistakes</dt>
     <dd>The X marks in the top right turn red for each wrong number entered. A third mistake ends the game.</dd>
     <dt>Remaining</dt>
@@ -464,7 +531,7 @@
     <dt>New puzzle</dt>
     <dd>Asks for a difficulty — Easy, Medium, Hard or Expert — then generates a puzzle at that level and restarts the timer. Cancel keeps the current game.</dd>
     <dt>Options</dt>
-    <dd>Opens the settings panel: turn the row, column and box highlighting on or off (it starts off), do the same for the cells already holding the selected number (they start highlighted), show or hide the time (it starts shown), show the clues counter or the remaining cell count, mute the placement sounds, or animate Solve.</dd>
+    <dd>Opens the settings panel: turn the row, column and box highlighting on or off (it starts off), do the same for the cells already holding the selected number (they start highlighted), show or hide the time and the difficulty level (both start shown), show the clues counter or the remaining cell count, mute the placement sounds, animate Solve, or switch to dark mode.</dd>
     <dt>Keyboard</dt>
     <dd>Arrow keys move, 1–9 enters a digit, N toggles Notes, Esc closes this help.</dd>
   </dl>
@@ -486,6 +553,10 @@
     <span>Show the time</span>
   </label>
   <label class="option">
+    <input type="checkbox" id="optLevel" checked>
+    <span>Show the difficulty level</span>
+  </label>
+  <label class="option">
     <input type="checkbox" id="optClues">
     <span>Show the clues counter</span>
   </label>
@@ -501,6 +572,15 @@
     <input type="checkbox" id="optAnimate">
     <span>Animate the Solve button (a number every half second)</span>
   </label>
+  <label class="option">
+    <input type="checkbox" id="optDark">
+    <span>Dark mode</span>
+  </label>
+  <div class="stats">
+    <p class="stats-title">Best times & wins</p>
+    <div id="statsList"></div>
+    <button class="btn stats-reset" id="resetStats">Reset stats</button>
+  </div>
   <button class="btn dialog-close" id="optionsClose">Close</button>
 </dialog>
 
@@ -518,6 +598,7 @@
 <dialog class="dialog" id="winDialog" aria-labelledby="winTitle">
   <h2 id="winTitle" tabindex="-1">You solved it</h2>
   <p class="win-summary" id="winSummary"></p>
+  <p class="win-best" id="winBest" hidden></p>
   <p class="win-prompt">Choose a difficulty for the next puzzle</p>
   <div class="level-choice">
     <button class="btn" data-level="easy">Easy</button>
@@ -687,6 +768,8 @@ var Sudoku = (function () {
   const notesBtn = document.getElementById("notesBtn");
   const autoBtn = document.getElementById("autoBtn");
   const timeField = document.getElementById("timeField");
+  const levelField = document.getElementById("levelField");
+  const levelMetric = document.getElementById("levelMetric");
   const solveBtn = document.getElementById("solve");
   const digitButtons = Array.from(pad.querySelectorAll("[data-digit]"));
   const shellEl = document.querySelector("main");
@@ -992,8 +1075,10 @@ var Sudoku = (function () {
   }
 
   // A finished puzzle offers the next one, with the current difficulty pre-selected.
-  function openWin(message) {
+  function openWin(message, bestLine) {
     winSummary.textContent = message;
+    winBest.textContent = bestLine || "";
+    winBest.hidden = !bestLine;
     syncLevelButtons();
     openDialog(winDialog);
   }
@@ -1011,6 +1096,7 @@ var Sudoku = (function () {
     started = false;
     focusDigit = 0;
     timerEl.textContent = "00:00";
+    levelMetric.textContent = "—";
     shellEl.inert = true;                  // nothing behind the splash is reachable
     syncNotesButtons();
     render();
@@ -1029,6 +1115,7 @@ var Sudoku = (function () {
     selected = null;
     locked = false;
     started = true;
+    levelMetric.textContent = level;
     splashEl.hidden = true;
     shellEl.inert = false;
     notesMode = false;
@@ -1088,10 +1175,16 @@ var Sudoku = (function () {
     }
 
     if (values.every((v, n) => v === solution[n])) {
-      const summary = "Solved in " + formatTime(Date.now() - startedAt) + " with " + errorText(errors) + ".";
+      const elapsed = Date.now() - startedAt;
+      const summary = "Solved in " + formatTime(elapsed) + " with " + errorText(errors) + ".";
+      const isBest = recordWin(elapsed);
       finish(summary);
       if (errors < 3) playApplause();
-      openWin(summary);
+      const levelName = LEVEL_NAMES[level] || level;
+      const bestPart = isBest
+        ? "New best time for " + levelName + "!"
+        : "Best for " + levelName + ": " + formatTime(stats[level].best);
+      openWin(summary, bestPart + " · " + winsText(stats[level].wins));
     }
   }
 
@@ -1178,6 +1271,10 @@ var Sudoku = (function () {
   const levelButtons = Array.from(levelDialog.querySelectorAll("[data-level]"));
   const winDialog = document.getElementById("winDialog");
   const winSummary = document.getElementById("winSummary");
+  const winBest = document.getElementById("winBest");
+  const statsList = document.getElementById("statsList");
+  const splashStats = document.getElementById("splashStats");
+  const resetStatsBtn = document.getElementById("resetStats");
   const winLevelButtons = Array.from(winDialog.querySelectorAll("[data-level]"));
 
   function openDialog(dialog) {
@@ -1215,45 +1312,175 @@ var Sudoku = (function () {
   document.getElementById("help").addEventListener("click", () => openDialog(helpDialog));
   document.getElementById("options").addEventListener("click", () => openDialog(optionsDialog));
 
-  const highlightToggle = document.getElementById("optHighlight");
-  highlightToggle.addEventListener("change", () => {
-    highlights = highlightToggle.checked;
-    render();
-  });
+  // Every option lives in one object so it can be saved, loaded and applied in a single pass.
+  const SETTINGS_KEY = "sudokuai.options";
+  const settings = {
+    highlightPeers: false,
+    highlightSame: true,
+    showTime: true,
+    showLevel: true,
+    showClues: false,
+    showRemaining: false,
+    sound: true,
+    animateSolve: false,
+    dark: false
+  };
 
-  const timeToggle = document.getElementById("optTime");
-  timeToggle.addEventListener("change", () => {
-    timeField.hidden = !timeToggle.checked;
-  });
+  const toggleSettings = [
+    ["optHighlight", "highlightPeers"],
+    ["optSame", "highlightSame"],
+    ["optTime", "showTime"],
+    ["optLevel", "showLevel"],
+    ["optClues", "showClues"],
+    ["optRemaining", "showRemaining"],
+    ["optSound", "sound"],
+    ["optAnimate", "animateSolve"],
+    ["optDark", "dark"]
+  ];
 
   const cluesField = document.getElementById("cluesField");
-  const cluesToggle = document.getElementById("optClues");
-  cluesToggle.addEventListener("change", () => {
-    cluesField.hidden = !cluesToggle.checked;
-  });
-
   const remainingField = document.getElementById("remainingField");
-  const remainingToggle = document.getElementById("optRemaining");
-  remainingToggle.addEventListener("change", () => {
-    remainingField.hidden = !remainingToggle.checked;
-  });
 
-  const soundToggle = document.getElementById("optSound");
-  soundToggle.addEventListener("change", () => {
-    soundOn = soundToggle.checked;
-    if (soundOn) unlockAudio();
-  });
-
-  const sameToggle = document.getElementById("optSame");
-  sameToggle.addEventListener("change", () => {
-    highlightSame = sameToggle.checked;
+  function applySettings() {
+    highlights = settings.highlightPeers;
+    highlightSame = settings.highlightSame;
+    soundOn = settings.sound;
+    animateSolve = settings.animateSolve;
+    document.body.classList.toggle("dark", settings.dark);
+    timeField.hidden = !settings.showTime;
+    levelField.hidden = !settings.showLevel;
+    cluesField.hidden = !settings.showClues;
+    remainingField.hidden = !settings.showRemaining;
+    for (const [id, key] of toggleSettings) document.getElementById(id).checked = settings[key];
     render();
+  }
+
+  // Storage can be unavailable (private mode, blocked cookies), so every call is guarded.
+  function loadSettings() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
+    } catch (err) {
+      saved = null;
+    }
+    if (!saved || typeof saved !== "object") return;
+    for (const [, key] of toggleSettings) {
+      if (typeof saved[key] === "boolean") settings[key] = saved[key];
+    }
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (err) {
+      /* not remembered, but the current session still works */
+    }
+  }
+
+  for (const [id, key] of toggleSettings) {
+    const toggle = document.getElementById(id);
+    toggle.addEventListener("change", () => {
+      settings[key] = toggle.checked;
+      saveSettings();
+      applySettings();
+      if (key === "sound" && settings.sound) unlockAudio();
+    });
+  }
+
+  // Wins and best time per level, kept on the device.
+  const STATS_KEY = "sudokuai.stats";
+  const LEVEL_NAMES = { easy: "Easy", medium: "Medium", hard: "Hard", expert: "Expert" };
+  const LEVELS = Object.keys(LEVEL_NAMES);
+  const emptyStats = () => ({
+    easy: { best: 0, wins: 0 },
+    medium: { best: 0, wins: 0 },
+    hard: { best: 0, wins: 0 },
+    expert: { best: 0, wins: 0 }
+  });
+  let stats = emptyStats();
+
+  function loadStats() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STATS_KEY) || "null");
+      if (!saved || typeof saved !== "object") return;
+      for (const key of LEVELS) {
+        const entry = saved[key];
+        if (typeof entry === "number") {
+          if (entry > 0) stats[key].best = entry;   // older saves held just a best time
+        } else if (entry && typeof entry === "object") {
+          if (typeof entry.best === "number" && entry.best > 0) stats[key].best = entry.best;
+          if (typeof entry.wins === "number" && entry.wins > 0) stats[key].wins = Math.floor(entry.wins);
+        }
+      }
+    } catch (err) {
+      /* unreadable stats are treated as empty */
+    }
+  }
+
+  function saveStats() {
+    try {
+      localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    } catch (err) {
+      /* not remembered, but this session still tracks them */
+    }
+  }
+
+  function winsText(n) {
+    return n + (n === 1 ? " win" : " wins");
+  }
+
+  function renderStats() {
+    statsList.textContent = "";
+    for (const key of LEVELS) {
+      const entry = stats[key];
+      const row = document.createElement("div");
+      row.className = "stats-row";
+      const name = document.createElement("span");
+      name.textContent = LEVEL_NAMES[key];
+      const value = document.createElement("span");
+      value.textContent = winsText(entry.wins) + (entry.best ? " · " + formatTime(entry.best) : "");
+      row.append(name, value);
+      statsList.appendChild(row);
+    }
+
+    const played = LEVELS.some((key) => stats[key].wins > 0);
+    splashStats.hidden = !played;
+    splashStats.textContent = played
+      ? "Wins — " + LEVELS.map((key) => LEVEL_NAMES[key] + " " + stats[key].wins).join(" · ")
+      : "";
+  }
+
+  // A third mistake ends the game, so every win recorded here has at most two.
+  function recordWin(ms) {
+    const entry = stats[level];
+    entry.wins += 1;
+    const isBest = !entry.best || ms < entry.best;
+    if (isBest) entry.best = ms;
+    saveStats();
+    renderStats();
+    return isBest;
+  }
+
+  // Two taps: reset loses data, so the first one only arms the button.
+  let resetArmed = false;
+  function disarmReset() {
+    resetArmed = false;
+    resetStatsBtn.textContent = "Reset stats";
+  }
+
+  resetStatsBtn.addEventListener("click", () => {
+    if (!resetArmed) {
+      resetArmed = true;
+      resetStatsBtn.textContent = "Tap again to clear";
+      return;
+    }
+    stats = emptyStats();
+    saveStats();
+    renderStats();
+    disarmReset();
   });
 
-  const animateToggle = document.getElementById("optAnimate");
-  animateToggle.addEventListener("change", () => {
-    animateSolve = animateToggle.checked;
-  });
+  optionsDialog.addEventListener("close", disarmReset);
 
   for (const btn of splashLevelButtons) {
     btn.addEventListener("click", () => {
@@ -1265,6 +1492,10 @@ var Sudoku = (function () {
   document.getElementById("splashOptions").addEventListener("click", () => openDialog(optionsDialog));
 
   boot();
+  loadSettings();
+  applySettings();
+  loadStats();
+  renderStats();
 })();
 </script>
 </body>
